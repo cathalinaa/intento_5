@@ -107,8 +107,8 @@ paginas = {
     "Datos": datos,
     "Gráficos": graficos,
 }
+pip install -r requirements.txt
 
-st.sidebar.title("Navegación")
 pagina = st.sidebar.radio("Seleccionar página", list(paginas.keys()))
 paginas[pagina]()
 pip install streamlit pandas matplotlib openpyxl
