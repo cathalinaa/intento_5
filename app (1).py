@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import openpyxl as px
 
 # Cargar datos
 file_path = "datos_paises_procesados (2).xlsx"
