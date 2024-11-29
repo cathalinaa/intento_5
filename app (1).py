@@ -1,116 +1,106 @@
+  import pandas as pd
+  import requests
+  import streamlit as st
 
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import openpyxl as px
+  def obtener_datos_api(api_url):
+    """Función que realiza la petición a la API y devuelve un DataFrame."""
+    response = requests.get(api_url)
+   if response.status_code == 200:
+        data = response.json()
+        return pd.DataFrame(data)
+    else:
+        st.error('Error al obtener los datos de la API')
+        return None
 
-# Cargar datos
-file_path = "datos_paises_procesados (2).xlsx"
-df = pd.read_excel(file_path)
 
-st.set_page_config(page_title="Análisis de Países", layout="wide")
+# Llamar la función para obtener los datos
+api_url = "https://restcountries.com/v3.1/all"
+df = obtener_datos_api(api_url)
+# Si hay datos, mostrar el DataFrame, mostrar dataframe con las columna seleccionadas, permitir filtrado y mostrar gráficos.
 
-# Función para la página de descripción
-def descripcion():
-    st.title("Descripción del Proyecto")
-    st.write("""
-    Esta aplicación permite analizar y visualizar datos de países, proporcionando 
-    información sobre población, área, número de idiomas, zonas horarias y más. 
-    Los datos han sido procesados y están listos para explorarse.
-    """)
-    st.write("### Variables principales:")
-    st.write("""
-    - **Nombre del País**: Nombre común del país.
-    - **Región Geográfica**: Región a la que pertenece el país.
-    - **Población Total**: Número total de habitantes.
-    - **Área (km²)**: Tamaño del territorio en kilómetros cuadrados.
-    - **Número de Fronteras**: Cantidad de países limítrofes.
-    - **Número de Idiomas**: Idiomas oficiales del país.
-    - **Número de Zonas Horarias**: Cantidad de zonas horarias asociadas.
-    """)
+if df is not None:
+    st.write(df.head())
 
-# Función para la página de datos
-def datos():
-    st.title("Interacción con los Datos")
-    st.dataframe(df)
+# Selección de columnas relevantes
+    df['Nombre'] = df['name'].apply(lambda x: x.get('common') if isinstance(x, dict) else None)
+    df['Región'] = df['region']
+    df['Población'] = df['population']
+    df['Área (km²)'] = df['area']
+    df['Fronteras'] = df['borders'].apply(lambda x: len(x) if isinstance(x, list) else 0)
+    df['Idiomas Oficiales'] = df['languages'].apply(lambda x: len(x) if isinstance(x, dict) else 0)
+    df['Zonas Horarias'] = df['timezones'].apply(lambda x: len(x) if isinstance(x, list) else 0)
 
-    # Selección de columna
-    columna = st.selectbox("Seleccionar columna para análisis", df.select_dtypes(include="number").columns)
-    st.write(f"**Media**: {df[columna].mean():,.2f}")
-    st.write(f"**Mediana**: {df[columna].median():,.2f}")
-    st.write(f"**Desviación estándar**: {df[columna].std():,.2f}")
+    # Filtrar columnas seleccionadas
+    columnas = ['Nombre', 'Región', 'Población', 'Área (km²)', 'Fronteras', 'Idiomas Oficiales', 'Zonas Horarias']
+    df_cleaned = df[columnas]
 
-    # Ordenar los datos
-    orden = st.radio("Ordenar los datos", ["Ascendente", "Descendente"])
-    df_ordenado = df.sort_values(by=columna, ascending=(orden == "Ascendente"))
-    st.write("Datos ordenados:")
-    st.dataframe(df_ordenado)
+    # Mostrar DataFrame con las columnas seleccionadas
+    st.title("Interacción con los datos:")
+    st.write("Mostrar datos originales:")
+    st.dataframe(df_cleaned)
 
-    # Filtrar los datos
-    filtro_valor = st.slider(f"Filtrar {columna}", 
-                             float(df[columna].min()), 
-                             float(df[columna].max()), 
-                             (float(df[columna].min()), float(df[columna].max())))
-    df_filtrado = df[(df[columna] >= filtro_valor[0]) & (df[columna] <= filtro_valor[1])]
-    st.write("Datos filtrados:")
-    st.dataframe(df_filtrado)
+    st.header("Selecciona una columna del dataframe utilizando un menú desplegable")
+    columnas = st.multiselect('Selecciona las columnas a visualizar', df_cleaned.columns.tolist(), default=df_cleaned.columns.tolist())
+    df_seleccionado = df_cleaned[columnas]
+    # Mostrar el DataFrame con las columnas seleccionadas
+    st.write('Columna Selecionada:')
+    st.write(df_seleccionado)
+    st.write("Estadísticas de las columnas seleccionadas:")
+    st.write("Media:",)
+    st.write(df_seleccionado.mean(numeric_only=True))
+    st.write("Mediana:",)
+    st.write(df_seleccionado.mean(numeric_only=True))
+    st.write("Desviación estándar:",)
+    st.write(df_seleccionado.std(numeric_only=True))
 
-    # Botón para descargar datos filtrados
-    if st.button("Descargar Datos Filtrados"):
-        csv = df_filtrado.to_csv(index=False).encode('utf-8')
-        st.download_button("Descargar CSV", csv, "datos_filtrados.csv", "text/csv")
+    columna_ordenar = st.selectbox('Selecciona una columna para ordenar', df_seleccionado.columns)
+    # Control para seleccionar el orden (ascendente o descendente)
+    orden = st.radio('Selecciona el orden:', ('Ascendente', 'Descendente'))
+    # Ordenar el DataFrame según la columna seleccionada y el orden elegido
+    if orden == 'Ascendente':
+        df_ordenado = df_seleccionado.sort_values(by=columna_ordenar, ascending=True)
+    else:
+        df_ordenado = df_seleccionado.sort_values(by=columna_ordenar, ascending=False)
+    # Mostrar el DataFrame ordenado
+    st.write('DataFrame Ordenado:')
+    st.write(df_ordenado)
+    columna_filtro = st.selectbox("Selecciona una columna para filtrar:", df.select_dtypes(include=['number']).columns)
+    if columna_filtro:
+     min_val, max_val = st.slider(
+        f"Selecciona el rango para {columna_filtro}:",
+        float(df[columna_filtro].min()),
+        float(df[columna_filtro].max()),
+        (float(df[columna_filtro].min()), float(df[columna_filtro].max())))
+    df_filtrado = df[(df[columna_filtro] >= min_val) & (df[columna_filtro] <= max_val)]
+    st.write("**Datos Filtrados:**")
+    st.write(df_filtrado)
 
-# Función para la página de gráficos
-def graficos():
-    st.title("Visualización de Datos")
+    # Botón para descargar los datos filtrados
+    st.subheader("Exportar Datos Filtrados")
+    formato = st.radio("Elige el formato para descargar:", ('CSV', 'Excel'))
 
-    # Selección de ejes
-    x = st.selectbox("Seleccionar eje X", df.select_dtypes(include="number").columns)
-    y = st.selectbox("Seleccionar eje Y", df.select_dtypes(include="number").columns)
+    @st.cache_data
+    def convertir_a_csv(df):
+        return df.to_csv(index=False).encode('utf-8')
 
-    # Selección de tipo de gráfico
-    tipo = st.radio("Seleccionar tipo de gráfico", ["Línea", "Barras", "Dispersión"])
+    @st.cache_data
+    def convertir_a_excel(df):
+        import io
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='DatosFiltrados')
+            writer.save()
+        return buffer.getvalue()
 
-    # Rango personalizado para los ejes
-    rango_x = st.slider(f"Rango del eje X ({x})", 
-                        float(df[x].min()), float(df[x].max()), 
-                        (float(df[x].min()), float(df[x].max())))
-    rango_y = st.slider(f"Rango del eje Y ({y})", 
-                        float(df[y].min()), float(df[y].max()), 
-                        (float(df[y].min()), float(df[y].max())))
-
-    # Crear gráfico
-    fig, ax = plt.subplots()
-    if tipo == "Línea":
-        ax.plot(df[x], df[y])
-    elif tipo == "Barras":
-        ax.bar(df[x], df[y])
-    elif tipo == "Dispersión":
-        ax.scatter(df[x], df[y])
-
-    ax.set_xlim(rango_x)
-    ax.set_ylim(rango_y)
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
-    st.pyplot(fig)
-
-    # Descargar gráfico
-    if st.button("Descargar Gráfico"):
-        from io import BytesIO
-        buffer = BytesIO()
-        fig.savefig(buffer, format="png")
-        buffer.seek(0)
-        st.download_button("Descargar Gráfico", buffer, file_name="grafico.png", mime="image/png")
-
-# Navegación entre páginas
-paginas = {
-    "Descripción": descripcion,
-    "Datos": datos,
-    "Gráficos": graficos,
-}
-pip install -r requirements.txt
-
-pagina = st.sidebar.radio("Seleccionar página", list(paginas.keys()))
-paginas[pagina]()
-pip install streamlit pandas matplotlib openpyxl
-
+    if formato == 'CSV':
+        st.download_button(
+            label="Descargar en CSV",
+            data=convertir_a_csv(df_filtrado),
+            file_name='datos_filtrados.csv',
+            mime='text/csv')
+    else:
+        st.download_button(
+            label="Descargar en Excel",
+            data=convertir_a_excel(df_filtrado),
+            file_name='datos_filtrados.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
